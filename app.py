@@ -7,10 +7,11 @@ import pytz
 app = Flask(__name__)
 CORS(app)
 
-# Conexión a MongoDB Atlas
 client = MongoClient("mongodb+srv://admin:admin123@cluster0.2owahcw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client["smart_parking"]
 stats = db["estadisticas"]
+
+tz = pytz.timezone("America/Argentina/Buenos_Aires")
 
 @app.route("/api/estadisticas/update", methods=["POST"])
 def update():
@@ -19,41 +20,26 @@ def update():
     tipo = data["tipo_vehiculo"]
     lugar = str(data["estacionamiento_id"])
 
-    # Hora actual con zona horaria de Buenos Aires
-    tz = pytz.timezone("America/Argentina/Buenos_Aires")
     ahora = datetime.now(tz)
 
-    # Obtener documento actual o crear uno nuevo
     doc = stats.find_one({"_id": "estadisticas"}) or {
         "_id": "estadisticas",
         "por_tipo_vehiculo": {},
         "por_estacionamiento": {},
-        "por_tipo_dia": {},
         "por_dia": {},
         "total_registros": 0
     }
 
-    # Incrementar por tipo de vehículo
+    # Incrementar conteos
     doc["por_tipo_vehiculo"][tipo] = doc["por_tipo_vehiculo"].get(tipo, 0) + 1
-
-    # Incrementar por estacionamiento
     doc["por_estacionamiento"][lugar] = doc["por_estacionamiento"].get(lugar, 0) + 1
 
-    # Tipo de día: laboral o fin de semana
-    dia_semana = ahora.weekday()  # 0 = lunes, 6 = domingo
-    tipo_dia = "Laboral" if dia_semana < 5 else "Fin de Semana"
-    doc.setdefault("por_tipo_dia", {})
-    doc["por_tipo_dia"][tipo_dia] = doc["por_tipo_dia"].get(tipo_dia, 0) + 1
-
-    # Día del mes (1 al 31)
+    # Día del mes (1-31)
     dia_mes = ahora.day
-    doc.setdefault("por_dia", {})
     doc["por_dia"][str(dia_mes)] = doc["por_dia"].get(str(dia_mes), 0) + 1
 
-    # Incrementar total de registros
     doc["total_registros"] += 1
 
-    # Guardar documento actualizado
     stats.replace_one({"_id": "estadisticas"}, doc, upsert=True)
 
     return jsonify({"message": "Actualizado"})
