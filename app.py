@@ -7,7 +7,7 @@ import pytz
 app = Flask(__name__)
 CORS(app)
 
-# Conexión a MongoDB
+# Conexión a MongoDB Atlas
 client = MongoClient("mongodb+srv://admin:admin123@cluster0.2owahcw.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 db = client["smart_parking"]
 stats = db["estadisticas"]
@@ -19,30 +19,36 @@ def update():
     tipo = data["tipo_vehiculo"]
     lugar = str(data["estacionamiento_id"])
 
-    # Obtener documento principal
+    # Obtener documento actual o crear uno nuevo
     doc = stats.find_one({"_id": "estadisticas"}) or {
         "_id": "estadisticas",
         "por_tipo_vehiculo": {},
         "por_estacionamiento": {},
         "por_tipo_dia": {},
+        "por_dia": {},
         "total_registros": 0
     }
 
-    # Actualizar tipo de vehículo
+    # Incrementar por tipo de vehículo
     doc["por_tipo_vehiculo"][tipo] = doc["por_tipo_vehiculo"].get(tipo, 0) + 1
 
-    # Actualizar por estacionamiento
+    # Incrementar por estacionamiento
     doc["por_estacionamiento"][lugar] = doc["por_estacionamiento"].get(lugar, 0) + 1
 
-    # Detectar tipo de día (laboral o fin de semana)
+    # Determinar tipo de día: laboral o fin de semana
     tz = pytz.timezone("America/Argentina/Buenos_Aires")
-    hoy = datetime.now(tz).weekday()  # 0 = lunes, 6 = domingo
-    tipo_dia = "Laboral" if hoy < 5 else "Fin de Semana"
-
+    ahora = datetime.now(tz)
+    dia_semana = ahora.weekday()  # 0 = lunes, 6 = domingo
+    tipo_dia = "Laboral" if dia_semana < 5 else "Fin de Semana"
     doc.setdefault("por_tipo_dia", {})
     doc["por_tipo_dia"][tipo_dia] = doc["por_tipo_dia"].get(tipo_dia, 0) + 1
 
-    # Incrementar registros
+    # Nueva métrica: por día del mes (1 al 31)
+    dia_mes = ahora.day
+    doc.setdefault("por_dia", {})
+    doc["por_dia"][str(dia_mes)] = doc["por_dia"].get(str(dia_mes), 0) + 1
+
+    # Incrementar total de registros
     doc["total_registros"] += 1
 
     # Guardar en MongoDB
