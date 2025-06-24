@@ -13,7 +13,7 @@ stats = db["estadisticas"]
 
 tz = pytz.timezone("America/Argentina/Buenos_Aires")
 
-@app.route("/api/estadisticas/update", methods=["POST"])
+@app.route("/api/estadisticas/update", methods=["GET,POST"])
 def update():
     data = request.get_json()
 
